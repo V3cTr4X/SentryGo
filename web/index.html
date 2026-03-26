@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SentryGo - Monitorización en tiempo real</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background: #f0f2f5;
+            color: #1a2634;
+        }
+        h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+        .host-selector {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        select, button {
+            padding: 8px 16px;
+            font-size: 1rem;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            background: white;
+            cursor: pointer;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+        }
+        button:hover { background: #45a049; }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        .chart-card {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .chart-card h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            color: #2c3e50;
+        }
+        canvas { width: 100%; height: auto; max-height: 300px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #4CAF50; color: white; }
+        .status {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 15px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 SentryGo - Monitorización</h1>
+    <div class="host-selector">
+        <label for="hosts"><strong>Host:</strong></label>
+        <select id="hosts">
+            <option value="">Cargando hosts...</option>
+        </select>
+        <button onclick="refreshData()">⟳ Actualizar ahora</button>
+    </div>
+
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h3>🖥️ CPU (%)</h3>
+            <canvas id="cpuChart"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>💾 Memoria (%)</h3>
+            <canvas id="memChart"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>💿 Disco (%)</h3>
+            <canvas id="diskChart"></canvas>
+        </div>
+    </div>
+
+    <h2>📋 Últimas métricas</h2>
+    <table id="metricsTable">
+        <thead>
+            <tr><th>Timestamp</th><th>CPU (%)</th><th>RAM (%)</th><th>Disco (%)</th></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <div class="status" id="statusMsg"></div>
+
+    <script>
+    let cpuChart = null, memChart = null, diskChart = null;
+    let updateInterval;
+
+    function parseTimestamp(timestamp) {
+        return new Date(timestamp.replace(/\.\d+/, ''));
+    }
+
+    function updateChart(chart, canvasId, labels, data, label, color) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        if (chart) {
+            // Actualizar datos existentes
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = data;
+            chart.update();
+            return chart;
+        } else {
+            // Crear nueva gráfica
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: { y: { beginAtZero: true, max: 100 } }
+                }
+            });
+        }
+    }
+
+    async function loadHosts() {
+        try {
+            const response = await fetch('/api/hosts');
+            const hosts = await response.json();
+            const select = document.getElementById('hosts');
+            select.innerHTML = '<option value="">Selecciona un host</option>';
+            hosts.forEach(host => {
+                const option = document.createElement('option');
+                option.value = host.Hostname;
+                option.textContent = host.Hostname;
+                select.appendChild(option);
+            });
+            const savedHost = localStorage.getItem('selectedHost');
+            if (savedHost && [...select.options].some(opt => opt.value === savedHost)) {
+                select.value = savedHost;
+            }
+            if (select.value) loadMetrics();
+        } catch (error) {
+            console.error('Error cargando hosts:', error);
+        }
+    }
+
+    async function loadMetrics() {
+        const hostname = document.getElementById('hosts').value;
+        if (!hostname) return;
+
+        localStorage.setItem('selectedHost', hostname);
+        document.getElementById('statusMsg').textContent = 'Actualizando datos...';
+
+        try {
+            const response = await fetch(`/api/metrics/${hostname}`);
+            const metrics = await response.json();
+
+            if (!metrics.length) {
+                document.getElementById('statusMsg').textContent = 'No hay métricas para este host.';
+                return;
+            }
+
+            const reversed = [...metrics].reverse();
+            const labels = reversed.map(m => parseTimestamp(m.timestamp).toLocaleTimeString());
+            const cpuData = reversed.map(m => m.cpu_percent);
+            const memData = reversed.map(m => m.mem_percent);
+            const diskData = reversed.map(m => m.disk_percent);
+
+            // Actualizar gráficas
+            cpuChart = updateChart(cpuChart, 'cpuChart', labels, cpuData, 'CPU (%)', '#ff6384');
+            memChart = updateChart(memChart, 'memChart', labels, memData, 'Memoria (%)', '#36a2eb');
+            diskChart = updateChart(diskChart, 'diskChart', labels, diskData, 'Disco (%)', '#ffce56');
+
+            // Actualizar tabla
+            const tbody = document.querySelector('#metricsTable tbody');
+            tbody.innerHTML = '';
+            metrics.slice(0, 10).forEach(m => {
+                const row = tbody.insertRow();
+                row.insertCell(0).textContent = parseTimestamp(m.timestamp).toLocaleString();
+                row.insertCell(1).textContent = m.cpu_percent.toFixed(2);
+                row.insertCell(2).textContent = m.mem_percent.toFixed(2);
+                row.insertCell(3).textContent = m.disk_percent.toFixed(2);
+            });
+
+            document.getElementById('statusMsg').textContent = `Última actualización: ${new Date().toLocaleTimeString()}`;
+        } catch (error) {
+            console.error('Error cargando métricas:', error);
+            document.getElementById('statusMsg').textContent = 'Error al cargar métricas.';
+        }
+    }
+
+    function refreshData() {
+        if (document.getElementById('hosts').value) loadMetrics();
+    }
+
+    // Inicialización
+    loadHosts();
+    document.getElementById('hosts').addEventListener('change', () => {
+        if (updateInterval) clearInterval(updateInterval);
+        loadMetrics();
+        updateInterval = setInterval(() => {
+            if (document.getElementById('hosts').value) loadMetrics();
+        }, 15000);
+    });
+    updateInterval = setInterval(() => {
+        if (document.getElementById('hosts').value) loadMetrics();
+    }, 15000);
+</script>
+</body>
+</html>

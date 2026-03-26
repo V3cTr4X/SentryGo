@@ -1,0 +1,30 @@
+# Binarios compilados
+/sentrygo-server
+/sentrygo-agent
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Dependencias y archivos de Go
+vendor/
+go.sum   # a veces se incluye, pero es opcional
+
+# Bases de datos locales
+*.db
+*.sqlite
+*.sqlite3
+
+# Archivos de configuración local (si contienen tokens)
+config.yaml
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
