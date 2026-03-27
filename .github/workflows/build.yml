@@ -3,7 +3,7 @@ name: Build and Release SentryGo
 on:
   push:
     tags:
-      - 'v*'   # Solo dispara release en tags que empiecen con vX.Y.Z
+      - 'v0.1.0'   # Solo dispara release en tags que empiecen con vX.Y.Z
   workflow_dispatch:
 
 env:
