@@ -10,16 +10,21 @@ import (
 )
 
 type Metric struct {
-	ID          uint      `gorm:"primaryKey"`
-	Hostname    string    `json:"hostname"`
-	Timestamp   time.Time `json:"timestamp"`
-	CPUPercent  float64   `json:"cpu_percent"`
-	MemTotal    uint64    `json:"mem_total"`
-	MemUsed     uint64    `json:"mem_used"`
-	MemPercent  float64   `json:"mem_percent"`
-	DiskTotal   uint64    `json:"disk_total"`
-	DiskUsed    uint64    `json:"disk_used"`
-	DiskPercent float64   `json:"disk_percent"`
+	ID             uint      `gorm:"primaryKey"`
+	Hostname       string    `json:"hostname"`
+	Timestamp      time.Time `json:"timestamp"`
+	CPUPercent     float64   `json:"cpu_percent"`
+	MemTotal       uint64    `json:"mem_total"`
+	MemUsed        uint64    `json:"mem_used"`
+	MemPercent     float64   `json:"mem_percent"`
+	DiskTotal      uint64    `json:"disk_total"`
+	DiskUsed       uint64    `json:"disk_used"`
+	DiskPercent    float64   `json:"disk_percent"`
+	// Nuevos campos
+	PingLatencyMs  float64   `json:"ping_latency_ms"`
+	ProcessCount   int32     `json:"process_count"`
+	TopProcessCPU  string    `json:"top_process_cpu"`
+	TopProcessMem  string    `json:"top_process_mem"`
 }
 
 type Host struct {
