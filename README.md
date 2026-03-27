@@ -96,7 +96,7 @@ interval: 30                     # seconds between sends
 
 # 📸 Screenshots
 
-![SentryGo Dashboard](./Screenshots/SentryGo-Alpha-0.1.0.png)
+![SentryGo Dashboard](./Screenshots/SentryGo-pre-alpha-0.2.0.png)
 
 # 🗺️ Roadmap
 
