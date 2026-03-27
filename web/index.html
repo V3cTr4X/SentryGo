@@ -3,72 +3,183 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SentryGo - Monitorización</title>
+    <title>SentryGo - Dashboard Configurable</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background: #f0f2f5; }
-        h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
-        .host-selector { background: white; padding: 15px 20px; border-radius: 12px; margin-bottom: 25px; display: flex; gap: 20px; align-items: center; }
-        select, button { padding: 8px 16px; font-size: 1rem; border-radius: 8px; border: 1px solid #ccc; cursor: pointer; }
-        button { background: #4CAF50; color: white; border: none; }
-        button:hover { background: #45a049; }
-        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 25px; margin-bottom: 30px; }
-        .chart-card { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .chart-card h3 { margin-top: 0; margin-bottom: 15px; font-size: 1.2rem; color: #2c3e50; }
-        canvas { width: 100%; height: auto; max-height: 300px; }
+        h1 { font-size: 1.8rem; margin-bottom: 0.5rem; color: #1a2634; }
+        
+        /* Panel de control */
+        .control-panel { background: white; border-radius: 12px; padding: 15px 20px; margin-bottom: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .host-selector { display: flex; gap: 20px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+        .host-selector select, .host-selector button { padding: 8px 16px; font-size: 1rem; border-radius: 8px; border: 1px solid #ccc; cursor: pointer; }
+        .host-selector button { background: #4CAF50; color: white; border: none; }
+        .host-selector button:hover { background: #45a049; }
+        
+        /* Selector de métricas */
+        .metrics-selector { border-top: 1px solid #e0e0e0; padding-top: 15px; }
+        .metrics-selector h3 { margin: 0 0 10px 0; font-size: 1rem; color: #666; }
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 15px; }
+        .checkbox-group label { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 5px 10px; background: #f8f9fa; border-radius: 20px; transition: all 0.2s; }
+        .checkbox-group label:hover { background: #e9ecef; }
+        .checkbox-group input { cursor: pointer; }
+        .checkbox-group input:checked + span { color: #4CAF50; font-weight: bold; }
+        
+        /* Grid de gráficas */
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 25px; margin-bottom: 30px; }
+        .chart-card { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: none; }
+        .chart-card.visible { display: block; }
+        .chart-card h3 { margin-top: 0; margin-bottom: 15px; font-size: 1.1rem; color: #2c3e50; display: flex; justify-content: space-between; align-items: center; }
+        .chart-card h3 .remove-btn { background: #dc3545; color: white; border: none; border-radius: 20px; padding: 2px 10px; font-size: 0.7rem; cursor: pointer; }
+        .chart-card h3 .remove-btn:hover { background: #c82333; }
+        canvas { width: 100%; height: auto; max-height: 280px; }
+        
+        /* Info de procesos */
+        .process-info { background: white; border-radius: 12px; padding: 15px; margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .process-card { text-align: center; padding: 10px; background: #f8f9fa; border-radius: 8px; }
+        .process-card h4 { margin: 0 0 10px 0; color: #4CAF50; }
+        .process-card .value { font-size: 1.3rem; font-weight: bold; color: #2c3e50; }
+        .process-card .detail { font-size: 0.8rem; color: #666; margin-top: 5px; word-break: break-all; }
+        
+        /* Tabla */
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 20px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #4CAF50; color: white; }
-        .process-info { background: white; border-radius: 12px; padding: 15px; margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #ddd; font-size: 0.85rem; }
+        th { background-color: #4CAF50; color: white; cursor: pointer; user-select: none; }
+        th:hover { background-color: #45a049; }
         .status { font-size: 0.9rem; color: #666; margin-top: 15px; text-align: center; }
+        .hidden-col { display: none; }
     </style>
 </head>
 <body>
-    <h1>📊 SentryGo - Monitorización</h1>
-    <div class="host-selector">
-        <label for="hosts"><strong>Host:</strong></label>
-        <select id="hosts">
-            <option value="">Cargando hosts...</option>
-        </select>
-        <button onclick="refreshData()">⟳ Actualizar ahora</button>
+    <h1>📊 SentryGo - Dashboard Configurable</h1>
+    
+    <div class="control-panel">
+        <div class="host-selector">
+            <label for="hosts"><strong>Host:</strong></label>
+            <select id="hosts">
+                <option value="">Cargando hosts...</option>
+            </select>
+            <button onclick="refreshData()">⟳ Actualizar ahora</button>
+        </div>
+        
+        <div class="metrics-selector">
+            <h3>📈 Selecciona las métricas a mostrar:</h3>
+            <div class="checkbox-group" id="metricsCheckboxes">
+                <label><input type="checkbox" value="cpu" checked> 🖥️ CPU (%)</label>
+                <label><input type="checkbox" value="mem" checked> 💾 Memoria (%)</label>
+                <label><input type="checkbox" value="disk" checked> 💿 Disco (%)</label>
+                <label><input type="checkbox" value="ping" checked> 🌐 Latencia (ms)</label>
+            </div>
+        </div>
     </div>
 
-    <div class="charts-grid">
-        <div class="chart-card"><h3>🖥️ CPU (%)</h3><canvas id="cpuChart"></canvas></div>
-        <div class="chart-card"><h3>💾 Memoria (%)</h3><canvas id="memChart"></canvas></div>
-        <div class="chart-card"><h3>💿 Disco (%)</h3><canvas id="diskChart"></canvas></div>
-        <div class="chart-card"><h3>🌐 Latencia (ms)</h3><canvas id="pingChart"></canvas></div>
+    <div class="charts-grid" id="chartsGrid">
+        <div id="cpuCard" class="chart-card" data-metric="cpu"><h3>🖥️ CPU (%)</h3><canvas id="cpuChart"></canvas></div>
+        <div id="memCard" class="chart-card" data-metric="mem"><h3>💾 Memoria (%)</h3><canvas id="memChart"></canvas></div>
+        <div id="diskCard" class="chart-card" data-metric="disk"><h3>💿 Disco (%)</h3><canvas id="diskChart"></canvas></div>
+        <div id="pingCard" class="chart-card" data-metric="ping"><h3>🌐 Latencia (ms)</h3><canvas id="pingChart"></canvas></div>
     </div>
 
     <div class="process-info">
-        <h3>📊 Información de procesos</h3>
-        <p><strong>Total de procesos:</strong> <span id="processCount">-</span></p>
-        <p><strong>Proceso con más CPU:</strong> <span id="topCPU">-</span></p>
-        <p><strong>Proceso con más RAM:</strong> <span id="topMem">-</span></p>
+        <div class="process-card"><h4>📊 Procesos totales</h4><div class="value" id="processCount">-</div></div>
+        <div class="process-card"><h4>⚡ Top CPU</h4><div class="value" id="topCPU">-</div><div class="detail">Proceso con mayor uso</div></div>
+        <div class="process-card"><h4>💾 Top RAM</h4><div class="value" id="topMem">-</div><div class="detail">Proceso con mayor memoria</div></div>
     </div>
 
     <h2>📋 Últimas métricas</h2>
     <table id="metricsTable">
-        <thead><tr><th>Timestamp</th><th>CPU (%)</th><th>RAM (%)</th><th>Disco (%)</th><th>Latencia (ms)</th><th>Procesos</th></tr></thead>
+        <thead id="tableHeader">
+            <tr>
+                <th data-col="timestamp">Timestamp</th>
+                <th data-col="cpu">CPU (%)</th>
+                <th data-col="mem">RAM (%)</th>
+                <th data-col="disk">Disco (%)</th>
+                <th data-col="ping">Latencia (ms)</th>
+                <th data-col="processes">Procesos</th>
+            </tr>
+        </thead>
         <tbody></tbody>
     </table>
     <div class="status" id="statusMsg"></div>
 
     <script>
-        let cpuChart, memChart, diskChart, pingChart;
+        let charts = {
+            cpu: null,
+            mem: null,
+            disk: null,
+            ping: null
+        };
         let updateInterval;
+
+        // Configuración de métricas
+        const metricConfig = {
+            cpu: { label: 'CPU (%)', color: '#ff6384', unit: '%', isPercent: true, field: 'cpu_percent' },
+            mem: { label: 'Memoria (%)', color: '#36a2eb', unit: '%', isPercent: true, field: 'mem_percent' },
+            disk: { label: 'Disco (%)', color: '#ffce56', unit: '%', isPercent: true, field: 'disk_percent' },
+            ping: { label: 'Latencia (ms)', color: '#aa66ff', unit: 'ms', isPercent: false, field: 'ping_latency_ms' }
+        };
 
         function parseTimestamp(timestamp) {
             return new Date(timestamp.replace(/\.\d+/, ''));
         }
 
-        function updateChart(chart, canvasId, labels, data, label, color, isMs = false) {
+        function loadPreferences() {
+            const saved = localStorage.getItem('selectedMetrics');
+            if (saved) {
+                const selected = JSON.parse(saved);
+                document.querySelectorAll('#metricsCheckboxes input').forEach(cb => {
+                    cb.checked = selected.includes(cb.value);
+                });
+            }
+            updateVisibleCharts();
+        }
+
+        function savePreferences() {
+            const selected = [];
+            document.querySelectorAll('#metricsCheckboxes input:checked').forEach(cb => {
+                selected.push(cb.value);
+            });
+            localStorage.setItem('selectedMetrics', JSON.stringify(selected));
+            updateVisibleCharts();
+            refreshData();
+        }
+
+        function updateVisibleCharts() {
+            const selected = [];
+            document.querySelectorAll('#metricsCheckboxes input:checked').forEach(cb => {
+                selected.push(cb.value);
+            });
+            
+            // Mostrar/ocultar tarjetas
+            document.querySelectorAll('.chart-card').forEach(card => {
+                const metric = card.dataset.metric;
+                if (selected.includes(metric)) {
+                    card.classList.add('visible');
+                } else {
+                    card.classList.remove('visible');
+                }
+            });
+            
+            // Mostrar/ocultar columnas de la tabla
+            document.querySelectorAll('#tableHeader th').forEach(th => {
+                const col = th.dataset.col;
+                if (col && selected.includes(col)) {
+                    th.classList.remove('hidden-col');
+                } else if (col) {
+                    th.classList.add('hidden-col');
+                }
+            });
+        }
+
+        function updateChart(chart, canvasId, labels, data, config) {
             const ctx = document.getElementById(canvasId).getContext('2d');
             const options = {
                 responsive: true,
                 maintainAspectRatio: true,
-                scales: { y: { beginAtZero: true, ...(isMs ? {} : { max: 100 }) } }
+                scales: config.isPercent ? { y: { beginAtZero: true, max: 100 } } : { y: { beginAtZero: true } }
             };
+            
             if (chart) {
                 chart.data.labels = labels;
                 chart.data.datasets[0].data = data;
@@ -77,7 +188,17 @@
             } else {
                 return new Chart(ctx, {
                     type: 'line',
-                    data: { labels: labels, datasets: [{ label: label, data: data, borderColor: color, backgroundColor: color + '20', tension: 0.1, fill: true }] },
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: config.label,
+                            data: data,
+                            borderColor: config.color,
+                            backgroundColor: config.color + '20',
+                            tension: 0.1,
+                            fill: true
+                        }]
+                    },
                     options: options
                 });
             }
@@ -119,39 +240,73 @@
             const reversed = [...metrics].reverse();
             const labels = reversed.map(m => parseTimestamp(m.timestamp).toLocaleTimeString());
             
-            cpuChart = updateChart(cpuChart, 'cpuChart', labels, reversed.map(m => m.cpu_percent), 'CPU (%)', '#ff6384', false);
-            memChart = updateChart(memChart, 'memChart', labels, reversed.map(m => m.mem_percent), 'Memoria (%)', '#36a2eb', false);
-            diskChart = updateChart(diskChart, 'diskChart', labels, reversed.map(m => m.disk_percent), 'Disco (%)', '#ffce56', false);
+            // Actualizar gráficas solo para métricas seleccionadas
+            const selected = [];
+            document.querySelectorAll('#metricsCheckboxes input:checked').forEach(cb => selected.push(cb.value));
             
-            const pingData = reversed.map(m => m.ping_latency_ms !== undefined ? m.ping_latency_ms : -1);
-            pingChart = updateChart(pingChart, 'pingChart', labels, pingData, 'Latencia (ms)', '#aa66ff', true);
-
-            if (metrics[0].process_count !== undefined) {
-                document.getElementById('processCount').textContent = metrics[0].process_count;
-                document.getElementById('topCPU').textContent = metrics[0].top_process_cpu || 'N/A';
-                document.getElementById('topMem').textContent = metrics[0].top_process_mem || 'N/A';
+            if (selected.includes('cpu')) {
+                const data = reversed.map(m => m.cpu_percent);
+                charts.cpu = updateChart(charts.cpu, 'cpuChart', labels, data, metricConfig.cpu);
+            }
+            if (selected.includes('mem')) {
+                const data = reversed.map(m => m.mem_percent);
+                charts.mem = updateChart(charts.mem, 'memChart', labels, data, metricConfig.mem);
+            }
+            if (selected.includes('disk')) {
+                const data = reversed.map(m => m.disk_percent);
+                charts.disk = updateChart(charts.disk, 'diskChart', labels, data, metricConfig.disk);
+            }
+            if (selected.includes('ping')) {
+                const data = reversed.map(m => m.ping_latency_ms !== undefined ? m.ping_latency_ms : -1);
+                charts.ping = updateChart(charts.ping, 'pingChart', labels, data, metricConfig.ping);
             }
 
+            // Actualizar información de procesos
+            if (metrics[0].process_count !== undefined) {
+                document.getElementById('processCount').textContent = metrics[0].process_count;
+                document.getElementById('topCPU').innerHTML = metrics[0].top_process_cpu || 'N/A';
+                document.getElementById('topMem').innerHTML = metrics[0].top_process_mem || 'N/A';
+            }
+
+            // Actualizar tabla (solo columnas seleccionadas)
             const tbody = document.querySelector('#metricsTable tbody');
             tbody.innerHTML = '';
-            metrics.slice(0, 10).forEach(m => {
+            metrics.slice(0, 15).forEach(m => {
                 const row = tbody.insertRow();
                 row.insertCell(0).textContent = parseTimestamp(m.timestamp).toLocaleString();
-                row.insertCell(1).textContent = m.cpu_percent.toFixed(2);
-                row.insertCell(2).textContent = m.mem_percent.toFixed(2);
-                row.insertCell(3).textContent = m.disk_percent.toFixed(2);
-                row.insertCell(4).textContent = m.ping_latency_ms !== undefined ? m.ping_latency_ms.toFixed(1) : '-';
-                row.insertCell(5).textContent = m.process_count !== undefined ? m.process_count : '-';
+                if (selected.includes('cpu')) row.insertCell(-1).textContent = m.cpu_percent.toFixed(1);
+                if (selected.includes('mem')) row.insertCell(-1).textContent = m.mem_percent.toFixed(1);
+                if (selected.includes('disk')) row.insertCell(-1).textContent = m.disk_percent.toFixed(1);
+                if (selected.includes('ping')) row.insertCell(-1).textContent = m.ping_latency_ms !== undefined ? m.ping_latency_ms.toFixed(1) : '-';
+                row.insertCell(-1).textContent = m.process_count !== undefined ? m.process_count : '-';
             });
 
             document.getElementById('statusMsg').textContent = `Última actualización: ${new Date().toLocaleTimeString()}`;
         }
 
-        function refreshData() { if (document.getElementById('hosts').value) loadMetrics(); }
+        function refreshData() {
+            if (document.getElementById('hosts').value) loadMetrics();
+        }
 
+        // Eventos
+        document.getElementById('hosts').addEventListener('change', () => {
+            if (updateInterval) clearInterval(updateInterval);
+            loadMetrics();
+            updateInterval = setInterval(() => {
+                if (document.getElementById('hosts').value) loadMetrics();
+            }, 15000);
+        });
+        
+        document.querySelectorAll('#metricsCheckboxes input').forEach(cb => {
+            cb.addEventListener('change', savePreferences);
+        });
+
+        // Inicializar
+        loadPreferences();
         loadHosts();
-        document.getElementById('hosts').addEventListener('change', () => { loadMetrics(); if (updateInterval) clearInterval(updateInterval); updateInterval = setInterval(() => { if (document.getElementById('hosts').value) loadMetrics(); }, 15000); });
-        updateInterval = setInterval(() => { if (document.getElementById('hosts').value) loadMetrics(); }, 15000);
+        updateInterval = setInterval(() => {
+            if (document.getElementById('hosts').value) loadMetrics();
+        }, 15000);
     </script>
 </body>
 </html>
