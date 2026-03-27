@@ -11,7 +11,7 @@ jobs:
         os: [linux, windows, darwin]
         arch: [amd64, arm64]
     env:
-      VERSION: 0.1.0  # Cambia la versión aquí
+      VERSION: 1.0.0  # Cambia la versión aquí
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -32,7 +32,7 @@ jobs:
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o sentrygo-agent-${{ matrix.os }}-${{ matrix.arch }} cmd/agent/main.go
 
       - name: Archive Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: sentrygo-binaries-${{ matrix.os }}-${{ matrix.arch }}
           path: |
@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: release-artifacts
 
